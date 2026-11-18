@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+visao/config.yaml
+visao/dados/
+visao/modelos/*.onnx
+visao/marcadores/
+cad/saida/
+*.step
+!cad/export/*.zip
+.DS_Store
+Thumbs.db

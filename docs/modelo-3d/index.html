@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mesa CNC Plasma 1500×1000 — Montagem 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#e9ecef; --panel:#fbfbfa; --ink:#1d2228; --quiet:#5b6570; --line:#d5d9de; --accent:#e8590c; --accent2:#1c6ab8;
+  --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'IBM Plex Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;background:radial-gradient(120% 90% at 60% 30%,#f7f8f9 0%,#dfe3e7 70%,#cfd5db 100%)}
+header{position:fixed;left:16px;top:14px;pointer-events:none}
+header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+header p{margin:3px 0 0;color:var(--quiet);font-size:12px;font-family:var(--mono)}
+#panel{position:fixed;right:14px;top:14px;bottom:14px;width:288px;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  overflow:auto;box-shadow:0 1px 0 rgba(0,0,0,.03);display:flex;flex-direction:column}
+#panel section{padding:12px 14px;border-bottom:1px solid var(--line)}
+#panel section:last-child{border-bottom:0}
+#panel h2{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--quiet)}
+.views{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:6px 4px;cursor:pointer}
+button:hover{border-color:#9aa4ae}
+button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.row label{flex:0 0 64px;color:var(--quiet)}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row output{flex:0 0 62px;text-align:right;font-family:var(--mono);font-size:12px}
+.layers label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;user-select:none}
+.sw{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:0 0 12px}
+.layers .mass{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--quiet)}
+.toggles{display:flex;flex-wrap:wrap;gap:6px}
+.readout{font-family:var(--mono);font-size:12px;background:#f1f3f5;border-radius:6px;padding:8px;line-height:1.55}
+#info{position:fixed;left:16px;bottom:16px;max-width:360px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;padding:10px 12px;display:none}
+#info b{display:block;font-size:13px;margin-bottom:4px}
+#info .k{font-family:var(--mono);font-size:11.5px;color:var(--quiet);line-height:1.6}
+#tip{position:fixed;pointer-events:none;background:rgba(29,34,40,.92);color:#fff;font-size:11.5px;padding:4px 7px;border-radius:5px;display:none;white-space:nowrap}
+#loading{position:fixed;inset:0;display:grid;place-items:center;font-family:var(--mono);color:var(--quiet);font-size:13px}
+.hint{color:var(--quiet);font-size:11.5px;line-height:1.45;margin:6px 0 0}
+#toggleP{display:none;position:fixed;right:14px;bottom:14px;z-index:5}
+@media (max-width:760px){
+  #panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:46vh}
+  #panel.hide{display:none}
+  #toggleP{display:block;bottom:auto;top:12px}
+  header h1{font-size:15px} header p{display:none}
+  #info{bottom:auto;top:52px;left:8px;right:8px;max-width:none}
+}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header>
+  <h1>Mesa CNC Plasma 1500 × 1000 — montagem 3D</h1>
+  <p>4 × NEMA23 25 kgf·cm · DM556 · SBR20 · cremalheira M1 · Mach3 USB · visão Raspberry Pi</p>
+</header>
+<button id="toggleP">Controles</button>
+<aside id="panel">
+  <section>
+    <h2>Vista</h2>
+    <div class="views">
+      <button data-v="iso" class="on">Iso</button>
+      <button data-v="front">Frente</button>
+      <button data-v="side">Lateral</button>
+      <button data-v="top">Topo</button>
+    </div>
+    <div class="views" style="margin-top:6px;grid-template-columns:1fr 1fr">
+      <button data-v="gantry">Detalhe pórtico</button>
+      <button data-v="zaxis">Detalhe eixo Z</button>
+      <button data-v="camera" style="grid-column:span 2">Detalhe câmeras / Raspberry</button>
+    </div>
+  </section>
+  <section>
+    <h2>Vista explodida</h2>
+    <div class="row"><label>Explodir</label><input id="exp" type="range" min="0" max="1" step="0.01" value="0"><output id="expO">0%</output></div>
+  </section>
+  <section>
+    <h2>Movimentar eixos</h2>
+    <div class="row"><label>X</label><input id="ax" type="range" min="0" max="1550" step="1"><output id="axO"></output></div>
+    <div class="row"><label>Y</label><input id="ay" type="range" min="0" max="1050" step="1"><output id="ayO"></output></div>
+    <div class="row"><label>Z</label><input id="az" type="range" min="0" max="100" step="1"><output id="azO"></output></div>
+    <div class="toggles" style="margin-top:8px"><button id="sim">▶ Simular corte</button><button id="home">Ir para home</button></div>
+    <p class="hint">Coordenadas de máquina com zero no home (X−, Y−, Z embaixo). Curso: 1550 × 1050 × 100 mm.</p>
+  </section>
+  <section>
+    <h2>Camadas</h2>
+    <div class="layers" id="layers"></div>
+  </section>
+  <section>
+    <h2>Exibir</h2>
+    <div class="toggles">
+      <button id="tEdges" class="on">Arestas</button>
+      <button id="tDims" class="on">Cotas</button>
+      <button id="tArea" class="on">Área útil</button>
+      <button id="tXray">Raio-X</button>
+    </div>
+    <p class="hint">Arraste para girar, botão direito para deslocar, roda para zoom. Clique numa peça para ver o nome e o item da lista de materiais.</p>
+  </section>
+  <section>
+    <h2>Peça selecionada</h2>
+    <div class="readout" id="sel">nenhuma</div>
+  </section>
+</aside>
+<div id="info"></div>
+<div id="tip"></div>
+<div id="loading">carregando modelo…</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const GROUPS = {
+  estrutura:     'Estrutura, bandeja e ripas',
+  guias_x:       'Trilhos e cremalheiras X',
+  portico:       'Pórtico (eixo X) + viga Y',
+  motores:       'Motores NEMA23',
+  carro_y:       'Carro Y',
+  eixo_z:        'Eixo Z — parte fixa',
+  eixo_z_movel:  'Eixo Z — parte móvel + tocha',
+  eletrica:      'Quadro elétrico',
+  visao:         'Visão computacional'
+};
+const SURF = {
+  trilho:[.75,.25], eixo:[.8,.22], bloco:[.55,.35], suporte_al:[.5,.4], pinhao:[.7,.35], motor_fl:[.6,.35],
+  fuso:[.7,.3], default:[.15,.6]
+};
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1500, -2000, 4000); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.5));
+
+const camera = new THREE.PerspectiveCamera(32, 1, 10, 40000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.12;
+
+// piso
+const grid = new THREE.GridHelper(6000, 30, 0xaab2ba, 0xc5ccd2);
+grid.rotation.x = Math.PI/2; grid.position.set(70, 0, -0.5); scene.add(grid);
+
+function b64(s, T){ const bin = atob(s); const u = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new T(u.buffer); }
+
+const data = await fetch('meshes.json').then(r => r.json());
+document.getElementById('loading').remove();
+const P0 = data.params;
+const parts = [];
+const groupMass = {};
+const edgeMat = new THREE.LineBasicMaterial({color:0x1d2228, transparent:true, opacity:.28});
+for (const p of data.parts){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(b64(p.pos, Float32Array), 3));
+  g.setIndex(new THREE.BufferAttribute(b64(p.idx, Uint32Array), 1));
+  g.computeVertexNormals();
+  const kind = Object.keys(SURF).find(k => p.id.includes(k)) || null;
+  const key = ({trilho_x_eixo:'trilho', trilho_y1_eixo:'trilho', trilho_y2_eixo:'trilho'})[p.id] || '';
+  const [met, rough] = SURF[key] || (p.grupo==='guias_x'||p.id.includes('eixo_z_')? SURF.eixo : SURF.default);
+  const col = new THREE.Color().setRGB(p.cor[0], p.cor[1], p.cor[2], THREE.SRGBColorSpace);
+  const isMetal = /trilho|eixo|bloco|sk20|pinhao|fuso|flange|acopl|castanha|rolamento|crem/.test(p.id);
+  const mat = new THREE.MeshStandardMaterial({color:col, metalness:isMetal?.55:.12, roughness:isMetal?.32:.62, side:THREE.DoubleSide});
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.userData = p;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(g, 28), edgeMat);
+  mesh.add(edges);
+  scene.add(mesh);
+  parts.push(mesh);
+  groupMass[p.grupo] = (groupMass[p.grupo]||0) + p.massa;
+}
+
+// ---------- camadas
+const layersEl = document.getElementById('layers');
+const visible = {};
+for (const [k, label] of Object.entries(GROUPS)){
+  visible[k] = true;
+  const sample = data.parts.find(p => p.grupo === k);
+  const c = sample ? sample.cor.map(x => Math.round(x*255)) : [128,128,128];
+  const el = document.createElement('label');
+  el.innerHTML = `<input type="checkbox" checked data-g="${k}"><span class="sw" style="background:rgb(${c})"></span>${label}<span class="mass">${(groupMass[k]||0).toFixed(1)} kg</span>`;
+  layersEl.appendChild(el);
+}
+layersEl.addEventListener('change', e => { visible[e.target.dataset.g] = e.target.checked; update(); });
+
+// ---------- estado
+const st = { exp:0, X: P0.g + 775, Y: P0.c + 525, Z: P0.zb - 885, edges:true, xray:false };
+const ax = document.getElementById('ax'), ay = document.getElementById('ay'), az = document.getElementById('az');
+ax.value = st.X; ay.value = st.Y; az.value = st.Z;
+
+function update(){
+  const dx = (st.X - 775) - P0.g, dy = (st.Y - 525) - P0.c, dz = (st.Z + 885) - P0.zb;
+  for (const m of parts){
+    const p = m.userData;
+    const e = p.exp, f = st.exp;
+    m.position.set(e[0]*f + (p.mov.includes('x')?dx:0), e[1]*f + (p.mov.includes('y')?dy:0), e[2]*f + (p.mov==='xyz'?dz:0));
+    m.visible = visible[p.grupo];
+    m.children[0].visible = st.edges;
+    m.material.transparent = st.xray && p.grupo === 'estrutura';
+    m.material.opacity = (st.xray && p.grupo === 'estrutura') ? .18 : 1;
+    m.material.depthWrite = !(st.xray && p.grupo === 'estrutura');
+  }
+  document.getElementById('axO').textContent = st.X.toFixed(0) + ' mm';
+  document.getElementById('ayO').textContent = st.Y.toFixed(0) + ' mm';
+  document.getElementById('azO').textContent = st.Z.toFixed(0) + ' mm';
+  document.getElementById('expO').textContent = Math.round(st.exp*100) + '%';
+  areaObj.visible = areaOn && st.exp < .05;
+}
+ax.oninput = () => { st.X = +ax.value; update(); };
+ay.oninput = () => { st.Y = +ay.value; update(); };
+az.oninput = () => { st.Z = +az.value; update(); };
+document.getElementById('exp').oninput = e => { st.exp = +e.target.value; update(); };
+
+// ---------- cotas e área útil
+function textSprite(txt, size=56, color='#1d2228', bg='rgba(255,255,255,.88)'){
+  const cv = document.createElement('canvas'); const ctx = cv.getContext('2d');
+  ctx.font = `500 ${size}px IBM Plex Mono, monospace`;
+  const w = ctx.measureText(txt).width + 28; cv.width = w; cv.height = size + 22;
+  ctx.font = `500 ${size}px IBM Plex Mono, monospace`;
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.fillText(txt, 14, cv.height/2 + 2);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
+  const h = 78; sp.scale.set(h * cv.width / cv.height, h, 1); sp.renderOrder = 10;
+  return sp;
+}
+const dims = new THREE.Group(); scene.add(dims);
+const dimMat = new THREE.LineBasicMaterial({color:0x1c6ab8});
+function dim(a, b, off, label){
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), O = new THREE.Vector3(...off);
+  const pts = [A, A.clone().add(O), A.clone().add(O), B.clone().add(O), B.clone().add(O), B];
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  dims.add(new THREE.LineSegments(g, dimMat));
+  const s = textSprite(label, 54, '#1c6ab8'); s.position.copy(A.clone().add(B).multiplyScalar(.5).add(O).add(O.clone().normalize().multiplyScalar(60)));
+  dims.add(s);
+}
+dim([-900,-675,0],[1040,-675,0],[0,-450,0],'1940');
+dim([1040,-675,0],[1040,675,0],[300,0,0],'1350');
+dim([1040,-675,0],[1040,-675,840],[0,-450,0],'840 (topo das ripas)');
+dim([-900,775,0],[-900,775,1421],[-300,0,0],'≈1420 (máquina)');
+dim([95,-875,0],[95,-875,2025],[0,-400,0],'≈2025 (câmera)');
+let areaOn = true;
+const areaObj = new THREE.Group(); scene.add(areaObj);
+{
+  const z = 846, x0 = -574, x1 = 926, y0 = -500, y1 = 500;
+  const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x0,y0,z),new THREE.Vector3(x1,y0,z),new THREE.Vector3(x1,y1,z),new THREE.Vector3(x0,y1,z),new THREE.Vector3(x0,y0,z)]);
+  const l = new THREE.Line(g, new THREE.LineDashedMaterial({color:0xe8590c, dashSize:30, gapSize:18})); l.computeLineDistances(); areaObj.add(l);
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(x1-x0, y1-y0), new THREE.MeshBasicMaterial({color:0xe8590c, transparent:true, opacity:.10, depthWrite:false}));
+  pl.position.set((x0+x1)/2, (y0+y1)/2, z-.5); areaObj.add(pl);
+  const s = textSprite('área útil 1500 × 1000', 54, '#e8590c'); s.position.set((x0+x1)/2, y0 + 90, z + 40); areaObj.add(s);
+}
+document.getElementById('tDims').onclick = e => { dims.visible = !dims.visible; e.target.classList.toggle('on', dims.visible); };
+document.getElementById('tArea').onclick = e => { areaOn = !areaOn; e.target.classList.toggle('on', areaOn); update(); };
+document.getElementById('tEdges').onclick = e => { st.edges = !st.edges; e.target.classList.toggle('on', st.edges); update(); };
+document.getElementById('tXray').onclick = e => { st.xray = !st.xray; e.target.classList.toggle('on', st.xray); update(); };
+
+// ---------- vistas
+const VIEWS = {
+  iso:   {t:[40,0,900],  p:[3900,-4700,3400]},
+  front: {t:[70,0,700],  p:[70,-6400,900]},
+  side:  {t:[70,0,700],  p:[6200,0,950]},
+  top:   {t:[20,0,700],  p:[20,-2,7600]},
+  gantry:{t:[0,0,980],  p:[1700,-1900,1750], rel:'g'},
+  zaxis: {t:[140,0,1130],p:[980,-900,1520], rel:'gc'},
+  camera:{t:[70,0,1700], p:[1400,-1500,2300]},
+};
+let anim = null;
+function goView(name){
+  const v = VIEWS[name];
+  const off = new THREE.Vector3((v.rel ? st.X - 775 : 0), (v.rel === 'gc' ? st.Y - 525 : 0), 0);
+  const tT = new THREE.Vector3(...v.t).add(off), tP = new THREE.Vector3(...v.p).add(off);
+  const fT = controls.target.clone(), fP = camera.position.clone(); const t0 = performance.now();
+  anim = (t) => { let k = Math.min(1, (t - t0)/600); k = k<.5 ? 2*k*k : 1 - Math.pow(-2*k+2,2)/2;
+    controls.target.lerpVectors(fT, tT, k); camera.position.lerpVectors(fP, tP, k); if (k>=1) anim = null; };
+  document.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === name));
+}
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => goView(b.dataset.v));
+controls.target.set(...VIEWS.iso.t); camera.position.set(...VIEWS.iso.p);
+
+// ---------- simulação (contorno com cantos arredondados + furo circular)
+let sim = null;
+const simBtn = document.getElementById('sim');
+simBtn.onclick = () => {
+  if (sim){ sim = null; simBtn.textContent = '▶ Simular corte'; simBtn.classList.remove('on'); return; }
+  simBtn.textContent = '■ Parar'; simBtn.classList.add('on');
+  const cx = 775, cy = 525, W = 1000, H = 640, r = 90, R = 160;
+  const segs = [];
+  // contorno externo
+  const pts = [];
+  const arc = (x, y, rad, a0, a1, n) => { for (let i=0;i<=n;i++){ const a=a0+(a1-a0)*i/n; pts.push([x+rad*Math.cos(a), y+rad*Math.sin(a)]); } };
+  const x0 = cx-W/2, x1 = cx+W/2, y0 = cy-H/2, y1 = cy+H/2;
+  arc(x1-r, y0+r, r, -Math.PI/2, 0, 8); arc(x1-r, y1-r, r, 0, Math.PI/2, 8);
+  arc(x0+r, y1-r, r, Math.PI/2, Math.PI, 8); arc(x0+r, y0+r, r, Math.PI, 1.5*Math.PI, 8); pts.push(pts[0]);
+  const hole = []; for (let i=0;i<=48;i++){ const a = 2*Math.PI*i/48; hole.push([cx+R*Math.cos(a), cy+R*Math.sin(a)]); }
+  const prog = [{z:0, pts:[[cx+R, cy]] , rapid:true}, {z:0, pts:hole}, {z:60, pts:[pts[0]], rapid:true}, {z:0, pts:pts}, {z:60, pts:[[cx, cy]], rapid:true}];
+  // achata em lista de pontos com velocidade
+  const q = [];
+  for (const b of prog){ for (const p of b.pts) q.push({x:p[0], y:p[1], z:b.z, v:b.rapid?2400:900}); }
+  let i = 0, cur = {x:st.X, y:st.Y, z:st.Z};
+  sim = {q, step(dt){
+    let budget = dt;
+    while (budget > 0 && i < q.length){
+      const t = q[i]; const d = Math.hypot(t.x-cur.x, t.y-cur.y, t.z-cur.z); const v = t.v * 0.001; // mm por ms (escala demo)
+      if (d < 1e-6){ i++; continue; }
+      const can = v * budget; if (can >= d){ cur = {x:t.x,y:t.y,z:t.z}; budget -= d/v; i++; } else { const k = can/d; cur = {x:cur.x+(t.x-cur.x)*k, y:cur.y+(t.y-cur.y)*k, z:cur.z+(t.z-cur.z)*k}; budget = 0; }
+    }
+    st.X = cur.x; st.Y = cur.y; st.Z = cur.z; ax.value = st.X; ay.value = st.Y; az.value = st.Z; update();
+    if (i >= q.length){ sim = null; simBtn.textContent = '▶ Simular corte'; simBtn.classList.remove('on'); }
+  }};
+};
+document.getElementById('home').onclick = () => { sim = null; simBtn.textContent='▶ Simular corte'; simBtn.classList.remove('on');
+  const f = {X:st.X, Y:st.Y, Z:st.Z}; const t0 = performance.now();
+  const tick = (t) => { const k = Math.min(1,(t-t0)/900); st.X = f.X*(1-k); st.Y = f.Y*(1-k); st.Z = f.Z + (100-f.Z)*k; ax.value=st.X; ay.value=st.Y; az.value=st.Z; update(); if (k<1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick); };
+
+// ---------- seleção / dica
+const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+const tip = document.getElementById('tip'); const info = document.getElementById('info'); const selEl = document.getElementById('sel');
+let selected = null, downAt = null;
+function pick(ev){
+  const r = canvas.getBoundingClientRect();
+  mouse.set(((ev.clientX - r.left)/r.width)*2-1, -((ev.clientY - r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(parts.filter(m => m.visible && !(st.xray && m.userData.grupo==='estrutura')), false);
+  return hits.length ? hits[0].object : null;
+}
+const GROUP_NAME = GROUPS;
+function showSel(m){
+  if (selected){ selected.material.emissive.setHex(0x000000); }
+  selected = m;
+  if (!m){ info.style.display='none'; selEl.textContent='nenhuma'; return; }
+  m.material.emissive.setHex(0x7a2a00);
+  const p = m.userData;
+  const html = `<b>${p.nome}</b><div class="k">item ${p.ref} · ${GROUP_NAME[p.grupo]}<br>massa ≈ ${p.massa < 0.1 ? (p.massa*1000).toFixed(0)+' g' : p.massa.toFixed(2)+' kg'} · id ${p.id}</div>`;
+  info.innerHTML = html; info.style.display = 'block'; selEl.innerHTML = `${p.ref} — ${p.nome}`;
+}
+canvas.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX-downAt[0], e.clientY-downAt[1]) > 4) return;
+  showSel(pick(e));
+});
+let lastMove = 0;
+canvas.addEventListener('pointermove', e => {
+  const now = performance.now(); if (now - lastMove < 60 || e.buttons) { if (e.buttons) tip.style.display='none'; return; } lastMove = now;
+  const m = pick(e);
+  if (m){ tip.textContent = m.userData.nome; tip.style.display='block'; tip.style.left = (e.clientX+14)+'px'; tip.style.top = (e.clientY+12)+'px'; }
+  else tip.style.display='none';
+});
+canvas.addEventListener('pointerleave', () => tip.style.display='none');
+document.getElementById('toggleP').onclick = () => document.getElementById('panel').classList.toggle('hide');
+
+// ---------- laço
+function resize(){ const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+update();
+let tPrev = performance.now();
+renderer.setAnimationLoop((t) => {
+  const dt = Math.min(50, t - tPrev); tPrev = t;
+  if (anim) anim(t);
+  if (sim) sim.step(dt);
+  controls.update();
+  renderer.render(scene, camera);
+});
+window.__viewer = {goView, st, update, setExp:v=>{st.exp=v;update();}, camera, controls};
+</script>
+</body>
+</html>
