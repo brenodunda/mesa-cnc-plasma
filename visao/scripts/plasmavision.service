@@ -1,0 +1,14 @@
+[Unit]
+Description=PlasmaVision - visao computacional da mesa plasma
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/mesa-cnc-plasma/visao
+ExecStart=/home/pi/mesa-cnc-plasma/visao/.venv/bin/python -m plasmavision --config config.yaml
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

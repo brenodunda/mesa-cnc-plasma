@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PlasmaVision — Mesa CNC Plasma</title>
+<style>
+:root{--bg:#121417;--pn:#1b1f24;--pn2:#232830;--ln:#2f3640;--tx:#e8eaed;--qt:#9aa3ad;--ok:#3ccf6e;--warn:#f5a524;--bad:#ff4d4f;--acc:#ff7a1a;--blue:#4aa3ff;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 var(--sans)}
+header{position:sticky;top:0;z-index:5;background:#0d0f12;border-bottom:1px solid var(--ln);padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.marca{font-weight:700;letter-spacing:.02em}.marca span{color:var(--acc)}
+.pill{font:12px var(--mono);padding:4px 9px;border-radius:999px;background:var(--pn2);border:1px solid var(--ln);white-space:nowrap}
+.pill.ok{border-color:#245c38;color:var(--ok)}.pill.bad{border-color:#6b2224;color:var(--bad)}.pill.warn{border-color:#6b4b14;color:var(--warn)}.pill.hot{background:#3a1d0c;border-color:var(--acc);color:#ffb37a}
+.dro{font:600 14px var(--mono);color:#cfe6ff}
+.esp{flex:1}
+.btn{font:600 13px var(--sans);border:1px solid var(--ln);background:var(--pn2);color:var(--tx);padding:9px 14px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:#56606c}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.go{background:#164a2a;border-color:#2c8a4f}.btn.hold{background:#4a3410;border-color:#a8741d}.btn.stop{background:#561618;border-color:#b02a2e}
+.btn.acc{background:#4a2610;border-color:var(--acc)}
+#alarme{display:none;background:#5c1012;border-bottom:2px solid var(--bad);padding:12px 14px;font-weight:700;align-items:center;gap:12px}
+#alarme.on{display:flex}
+nav{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--ln);background:#0f1114;overflow-x:auto}
+nav button{background:none;border:0;color:var(--qt);padding:11px 14px;font:600 13px var(--sans);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button.on{color:var(--tx);border-bottom-color:var(--acc)}
+main{padding:14px;max-width:1500px;margin:0 auto}
+.aba{display:none}.aba.on{display:block}
+.grade{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+@media(max-width:900px){.grade{grid-template-columns:1fr}}
+.cartao{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.cartao h3{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--qt)}
+.video{position:relative;background:#000;border-radius:8px;overflow:hidden;line-height:0}
+.video img{width:100%;display:block}
+.video canvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+.linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+label.c{display:flex;gap:6px;align-items:center;color:var(--qt)}
+input,select{background:#0f1215;color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:7px 8px;font:13px var(--sans)}
+input[type=number]{width:90px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:left}th{color:var(--qt);font-weight:600}
+.mono{font-family:var(--mono)}.qt{color:var(--qt)}.ok{color:var(--ok)}.bad{color:var(--bad)}
+#log{font:12px var(--mono);max-height:300px;overflow:auto;color:#c5ccd3}
+#log div{padding:2px 0;border-bottom:1px dashed #262c33}
+.passo{display:flex;gap:10px;align-items:flex-start}.num{flex:0 0 26px;height:26px;border-radius:50%;background:var(--pn2);border:1px solid var(--ln);display:grid;place-items:center;font:600 12px var(--mono);color:var(--acc)}
+.barra{height:10px;background:#0f1215;border:1px solid var(--ln);border-radius:5px;overflow:hidden}.barra i{display:block;height:100%;background:var(--acc)}
+.aviso{background:#2b2010;border:1px solid #6b4b14;color:#f1c27a;border-radius:8px;padding:9px 11px;font-size:13px}
+#toast{position:fixed;right:14px;bottom:14px;background:#22272e;border:1px solid var(--ln);border-left:3px solid var(--acc);padding:10px 14px;border-radius:8px;max-width:420px;display:none;z-index:9}
+.prev{width:100%;border-radius:8px;border:1px solid var(--ln);background:#000;min-height:60px}
+</style>
+</head>
+<body>
+<header>
+  <div class="marca">Plasma<span>Vision</span></div>
+  <span id="pMach" class="pill">Mach3 …</span>
+  <span class="dro" id="dro">X — Y — Z —</span>
+  <span id="pArco" class="pill">arco —</span>
+  <span id="pSeg" class="pill">segurança —</span>
+  <span id="pSim" class="pill warn" style="display:none">SIMULAÇÃO</span>
+  <span class="esp"></span>
+  <button class="btn go" id="bStart" title="Cycle Start">▶ Cycle Start</button>
+  <button class="btn hold" id="bHold">❚❚ Pausar</button>
+  <button class="btn stop" id="bStop">■ Parar</button>
+</header>
+<div id="alarme"><span id="alarmeTxt">ALARME</span><span class="esp"></span><button class="btn" id="bAck">Reconhecer alarme</button></div>
+<nav id="abas">
+  <button data-a="vivo" class="on">Ao vivo</button><button data-a="corte">Chapa e corte</button><button data-a="arco">Arco</button>
+  <button data-a="seg">Segurança</button><button data-a="med">Medição</button><button data-a="cal">Calibração</button>
+</nav>
+<main>
+<!-- AO VIVO -->
+<section class="aba on" id="vivo">
+  <div class="grade">
+    <div>
+      <div class="cartao"><h3>Câmera do topo</h3><div class="video"><img id="vTopo" alt="câmera do topo"></div></div>
+    </div>
+    <div>
+      <div class="cartao"><h3>Câmera da tocha</h3><div class="video"><img id="vTocha" alt="câmera da tocha"></div></div>
+      <div class="cartao"><h3>Automação da tocha</h3>
+        <div class="mono" id="autEstado">—</div><div id="autMsg" style="font-size:18px;font-weight:700;margin-top:6px">—</div>
+        <div class="linha"><button class="btn" id="bArmar">Armar</button><button class="btn" id="bDesarmar">Desarmar</button></div>
+      </div>
+      <div class="cartao" id="simCard" style="display:none"><h3>Simulação</h3>
+        <div class="linha"><button class="btn" data-sim="pessoa">Pessoa entra/sai</button><button class="btn" data-sim="retalho">Trocar por retalho</button>
+        <button class="btn" data-sim="chapa">Chapa nova</button><button class="btn" data-sim="operador">Operador auto liga/desliga</button></div>
+      </div>
+      <div class="cartao"><h3>Eventos</h3><div id="log"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CHAPA E CORTE -->
+<section class="aba" id="corte">
+  <div class="grade">
+    <div class="cartao"><h3>Prévia</h3><img class="prev" id="pvCorte" alt=""><p class="qt" id="pvLegenda">Capture a chapa para ver o material encontrado (verde = área útil).</p></div>
+    <div>
+      <div class="cartao"><div class="passo"><div class="num">1</div><div style="flex:1"><b>Chapa</b><p class="qt">Estacione o pórtico fora da chapa (ou ele é ignorado pela faixa onde está) e capture.</p>
+        <div class="linha"><button class="btn acc" id="bChapa">Capturar chapa</button><button class="btn" id="bNova" title="apaga o histórico de peças já cortadas nesta chapa">Chapa nova</button></div><div id="pecas"></div><div id="cortes" class="qt"></div></div></div></div>
+      <div class="cartao"><div class="passo"><div class="num">2</div><div style="flex:1"><b>G-code</b><p class="qt">Programa com M0 em cada furação (ACENDA) e fim de contorno (SOLTE).</p>
+        <div class="linha"><input type="file" id="fGcode" accept=".tap,.nc,.ngc,.gcode,.txt"><button class="btn" id="bExemplo">Peça de teste</button></div><div id="jobInfo" class="mono qt"></div></div></div></div>
+      <div class="cartao"><div class="passo"><div class="num">3</div><div style="flex:1"><b>Posicionar</b>
+        <div class="linha"><label class="c">Ângulos <select id="sAng"><option value="chapa">só o da chapa</option><option value="90" selected>chapa + 90°</option><option value="45">a cada 45°</option><option value="15">a cada 15°</option></select></label></div>
+        <div class="linha"><label class="c">Folga <input type="number" id="nFolga" value="6" step="1"> mm</label><label class="c">Kerf <input type="number" id="nKerf" value="1.6" step="0.1"> mm</label></div>
+        <div class="linha"><label class="c">Preferir <select id="sPref"><option value="canto">canto (economiza chapa)</option><option value="centro">centro</option></select></label></div>
+        <button class="btn acc" id="bPos">Encaixar</button><div id="posInfo" class="mono qt" style="margin-top:6px"></div></div></div></div>
+      <div class="cartao"><div class="passo"><div class="num">4</div><div style="flex:1"><b>Enviar ao Mach3</b>
+        <div class="linha"><label class="c"><input type="checkbox" id="cArmar" checked> armar automação da tocha</label></div>
+        <div class="linha"><button class="btn go" id="bEnviar">Enviar</button><a class="btn" href="/api/job/gcode" style="text-decoration:none">Baixar G-code</a></div></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCO -->
+<section class="aba" id="arco">
+  <div class="grade">
+    <div class="cartao"><h3>Câmera da tocha</h3><div class="video"><img id="vTocha2" alt=""></div></div>
+    <div class="cartao"><h3>Detector de arco</h3>
+      <div class="linha"><span>Brilho na região:</span><b class="mono" id="metrica">—</b></div><div class="barra"><i id="barra" style="width:0"></i></div>
+      <div class="linha"><label class="c">Limiar de brilho <input type="number" id="aLim" min="100" max="255"></label></div>
+      <div class="linha"><label class="c">Liga acima de <input type="number" id="aOn" step="0.005"> </label><label class="c">desliga abaixo de <input type="number" id="aOff" step="0.005"></label></div>
+      <div class="linha"><label class="c">Tempo de furação <input type="number" id="aFur" step="0.1"> s</label></div>
+      <button class="btn" id="bArcoSalvar">Aplicar</button>
+      <p class="qt">Ajuste com o arco aceso numa sucata: a barra deve passar bem do "liga acima de". Com a tocha apagada ela fica perto de zero.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SEGURANÇA -->
+<section class="aba" id="seg">
+  <div class="aviso">Recurso de auxílio: não substitui o botão de emergência nem as proteções exigidas pela NR-12.</div><br>
+  <div class="grade">
+    <div class="cartao"><h3>Zona de exclusão — clique para desenhar</h3><div class="video"><img id="vTopo2" alt=""><canvas id="cvZona"></canvas></div>
+      <div class="linha"><button class="btn" id="zNova">Nova zona</button><button class="btn" id="zLimpar">Apagar zonas</button><button class="btn acc" id="zSalvar">Salvar zonas</button></div>
+      <p class="qt">Marque o corredor em volta da mesa por onde alguém se aproxima. Evite cobrir a área de corte se usar o modo movimento (fumaça e faíscas disparam).</p></div>
+    <div>
+      <div class="cartao"><h3>Monitor</h3><div class="linha"><label class="c"><input type="checkbox" id="cSeg"> ativo</label><span class="pill" id="segModo">—</span></div></div>
+      <div class="cartao"><h3>Alarmes</h3><div id="segEventos" class="qt">nenhum</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- MEDIÇÃO -->
+<section class="aba" id="med">
+  <div class="grade">
+    <div class="cartao"><h3>Resultado</h3><img class="prev" id="pvMed" alt=""><div id="medRes"></div></div>
+    <div>
+      <div class="cartao"><h3>Referência</h3><div class="linha"><input type="file" id="fDxf" accept=".dxf"></div>
+        <div class="linha"><label class="c">Comparar com <select id="sRef"><option value="dxf">DXF enviado</option><option value="job">contorno do G-code</option><option value="nenhuma">só medir</option></select></label></div><div id="refInfo" class="qt"></div></div>
+      <div class="cartao"><h3>Região (mm de máquina, opcional)</h3>
+        <div class="linha"><input type="number" id="r0" placeholder="X1"><input type="number" id="r1" placeholder="Y1"><input type="number" id="r2" placeholder="X2"><input type="number" id="r3" placeholder="Y2"></div>
+        <p class="qt">Deixe vazio para medir a maior peça vista. Coloque a peça longe da chapa e do pórtico.</p>
+        <button class="btn acc" id="bMedir">Medir</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- CALIBRAÇÃO -->
+<section class="aba" id="cal">
+  <div class="grade">
+    <div class="cartao"><h3>Imagem</h3><img class="prev" id="pvCal" alt=""><p class="qt" id="calInfo"></p></div>
+    <div>
+      <div class="cartao"><div class="passo"><div class="num">1</div><div><b>Mesa vazia</b><p class="qt">Tire tudo da mesa, pórtico estacionado, luz normal de trabalho.</p><button class="btn" id="bVazia">Capturar mesa vazia</button></div></div></div>
+      <div class="cartao"><div class="passo"><div class="num">2</div><div style="flex:1"><b>Marcadores ArUco</b><p class="qt">Coloque os 4 marcadores impressos sobre a mesa. Leve a tocha ao centro de cada um e clique "usar posição da tocha" (ou digite X/Y).</p>
+        <button class="btn" id="bMarc">Procurar marcadores</button><table id="tMarc" style="margin-top:8px"></table></div></div></div>
+      <div class="cartao"><div class="passo"><div class="num">3</div><div><b>Calcular</b><p class="qt">Com os marcadores ainda na mesa.</p><button class="btn acc" id="bCalc">Calcular calibração</button></div></div></div>
+    </div>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+let E={}, abaAtual='vivo';
+function toast(t,ruim){const el=$('#toast');el.textContent=t;el.style.borderLeftColor=ruim?'var(--bad)':'var(--acc)';el.style.display='block';clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',4500)}
+async function api(url,opt={}){const r=await fetch(url,Object.assign({method:'POST',headers:opt.body&&!(opt.body instanceof FormData)?{'Content-Type':'application/json'}:{}},opt));
+  let d=null;try{d=await r.json()}catch(e){} if(!r.ok){toast((d&&d.detail)||('erro '+r.status),true);throw new Error(d&&d.detail)} return d}
+const jpost=(u,o)=>api(u,{body:JSON.stringify(o||{})});
+const refresh=(img,src)=>{img.src=src+'?t='+Date.now()};
+
+// abas
+function abrir(a){if(!document.getElementById(a))return;abaAtual=a;$$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.a===a));$$('.aba').forEach(s=>s.classList.toggle('on',s.id===a));if(location.hash!=='#'+a)history.replaceState(null,'','#'+a);streams()}
+$('#abas').onclick=e=>{const a=e.target.dataset.a;if(a)abrir(a)};
+if(location.hash){abrir(location.hash.slice(1));setTimeout(()=>scrollTo(0,0),0)}
+function streams(){const map={vivo:[['#vTopo','topo'],['#vTocha','tocha']],arco:[['#vTocha2','tocha']],seg:[['#vTopo2','topo']]};
+  $$('.video img').forEach(i=>{if(!(map[abaAtual]||[]).some(([s])=>$(s)===i))i.removeAttribute('src')});
+  (map[abaAtual]||[]).forEach(([s,c])=>{const i=$(s);if(!i.getAttribute('src'))i.src='/stream/'+c})}
+streams();
+
+// estado
+function fmt(v){return (v==null||isNaN(v))?'—':Number(v).toFixed(2)}
+async function estado(){try{const r=await fetch('/api/status');E=await r.json();desenhar()}catch(e){$('#pMach').className='pill bad';$('#pMach').textContent='painel sem conexão'}}
+setInterval(estado,400);estado();
+function desenhar(){
+  const m=E.mach3||{};$('#pMach').className='pill '+(m.conectada?'ok':'bad');$('#pMach').textContent=m.conectada?('Mach3 '+(m.movendo?'movendo':'parado')):'Mach3 desconectado';
+  $('#dro').textContent=`X ${fmt(m.x)}  Y ${fmt(m.y)}  Z ${fmt(m.z)}`;
+  const a=E.arco||{};$('#pArco').className='pill '+(a.ligado?'hot':'');$('#pArco').textContent='arco '+(a.ligado?'LIGADO':'desligado');
+  const s=E.seguranca||{};$('#pSeg').className='pill '+(s.alarme?'bad':(s.ativo?'ok':'warn'));$('#pSeg').textContent=s.alarme?'ALARME':('segurança '+(s.ativo?s.modo:'desligada'));
+  $('#alarme').classList.toggle('on',!!s.alarme);$('#alarmeTxt').textContent='ALARME DE SEGURANÇA: '+(s.motivo||'')+' — máquina pausada e tocha bloqueada';
+  $('#pSim').style.display=E.simulado?'':'none';$('#simCard').style.display=E.simulado?'':'none';
+  $('#bStart').disabled=!E.pode_comandar||!!s.alarme;$('#bStart').title=E.pode_comandar?'':'movimento só pela rede da oficina';
+  const au=E.automacao||{};$('#autEstado').textContent=`${au.estado||'—'}  ${au.total?('M0 '+au.indice+'/'+au.total):''}`;$('#autMsg').textContent=au.mensagem||'';
+  $('#log').innerHTML=(E.eventos||[]).map(e=>`<div><span class="qt">${e.hora}</span> ${e.msg}</div>`).join('');
+  $('#metrica').textContent=(100*(a.metrica||0)).toFixed(1)+'%';$('#barra').style.width=Math.min(100,400*(a.metrica||0))+'%';
+  $('#segModo').textContent=s.modo||'—';if(document.activeElement!==$('#cSeg'))$('#cSeg').checked=!!s.ativo;
+  $('#segEventos').innerHTML=(s.eventos||[]).length?(s.eventos.map(ev=>`<div class="linha"><span class="mono">${ev.hora}</span> ${ev.motivo} <a href="/evento/${ev.imagem}" target="_blank" style="color:var(--blue)">foto</a></div>`).join('')):'nenhum';
+  $('#cortes').textContent=E.cortes_na_chapa?`${E.cortes_na_chapa} job(s) já cortado(s) nesta chapa ficam bloqueados no encaixe.`:'';
+  const c=E.calibracao||{};$('#calInfo').textContent=c.pronta?`Calibrada — erro médio ${fmt(c.erro_rms_mm)} mm. Mesa vazia: ${c.mesa_vazia?'ok':'falta'}`:'Ainda não calibrada.';
+  if(!desenhar._z){desenhar._z=1;zonas=JSON.parse(JSON.stringify(s.zonas||[]));desenhaZonas()}
+}
+// comandos
+$('#bStart').onclick=()=>api('/api/mach3/cycle_start').then(()=>toast('Cycle Start'));
+$('#bHold').onclick=()=>api('/api/mach3/feed_hold').then(()=>toast('Pausado'));
+$('#bStop').onclick=()=>api('/api/mach3/stop').then(()=>toast('Parado'));
+$('#bAck').onclick=()=>api('/api/seguranca/reconhecer').then(()=>toast('Alarme reconhecido'));
+$('#bArmar').onclick=()=>api('/api/arco/armar').then(()=>toast('Automação armada'));
+$('#bDesarmar').onclick=()=>api('/api/arco/desarmar').then(()=>toast('Automação desarmada'));
+$$('[data-sim]').forEach(b=>b.onclick=()=>api('/api/sim/'+b.dataset.sim).then(d=>toast('simulação: '+JSON.stringify(d))));
+
+// chapa e corte
+$('#bChapa').onclick=async()=>{const d=await api('/api/chapa/capturar');refresh($('#pvCorte'),'/previa/chapa.jpg');
+  $('#pecas').innerHTML='<table><tr><th>#</th><th>tipo</th><th>mm</th><th>ângulo</th></tr>'+d.pecas.map((p,i)=>`<tr><td>${i+1}</td><td>${p.tipo}</td><td class="mono">${p.dimensoes_mm[0].toFixed(0)}×${p.dimensoes_mm[1].toFixed(0)}</td><td class="mono">${p.angulo_graus.toFixed(2)}°</td></tr>`).join('')+'</table>';
+  $('#pvLegenda').textContent=d.pecas.length?'Laranja: contorno do material. Verde: área útil (já descontada a margem da borda).':'Nenhum material encontrado.'};
+$('#bNova').onclick=()=>api('/api/chapa/nova').then(()=>toast('Histórico de cortes apagado'));
+function mostraJob(d){$('#jobInfo').innerHTML=`${d.nome}<br>tamanho ${d.tamanho_mm[0]} × ${d.tamanho_mm[1]} mm · M0: ${d.sequencia_tocha.length}`+(d.avisos.length?'<br><span class="bad">'+d.avisos.join('<br>')+'</span>':'')}
+$('#fGcode').onchange=async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('arquivo',f);mostraJob(await api('/api/job',{body:fd}))};
+$('#bExemplo').onclick=async()=>mostraJob(await api('/api/job/exemplo?largura=200&altura=120&furo=40'));
+$('#bPos').onclick=async()=>{const d=await jpost('/api/job/posicionar',{angulos:$('#sAng').value,folga_mm:+$('#nFolga').value,kerf_mm:+$('#nKerf').value,preferencia:$('#sPref').value});
+  refresh($('#pvCorte'),'/previa/encaixe.jpg');$('#pvLegenda').textContent='Azul/laranja: trajetória do corte já girada e deslocada para a chapa. Cinza: deslocamentos rápidos.';
+  $('#posInfo').textContent=`girar ${d.angulo_graus.toFixed(2)}° · deslocar X ${d.dx.toFixed(1)} Y ${d.dy.toFixed(1)} mm`};
+$('#bEnviar').onclick=async()=>{const d=await jpost('/api/job/enviar',{armar_arco:$('#cArmar').checked});toast('Enviado: '+d.arquivo)};
+
+// arco
+function preencheArco(){fetch('/api/arco/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(c=>{$('#aLim').value=c.limiar_brilho;$('#aOn').value=c.fracao_ligado;$('#aOff').value=c.fracao_desligado;$('#aFur').value=c.atraso_furacao_s})}
+preencheArco();
+$('#bArcoSalvar').onclick=()=>jpost('/api/arco/ajustes',{limiar_brilho:+$('#aLim').value,fracao_ligado:+$('#aOn').value,fracao_desligado:+$('#aOff').value,atraso_furacao_s:+$('#aFur').value}).then(()=>toast('Ajustes do arco aplicados'));
+
+// segurança: editor de zonas
+let zonas=[],zAtual=null;const cv=$('#cvZona');
+function desenhaZonas(){const r=cv.getBoundingClientRect();cv.width=r.width;cv.height=r.height;const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);
+  const todas=zAtual?zonas.concat([zAtual]):zonas;todas.forEach(z=>{g.beginPath();z.forEach(([x,y],i)=>i?g.lineTo(x*cv.width,y*cv.height):g.moveTo(x*cv.width,y*cv.height));if(z!==zAtual)g.closePath();
+  g.strokeStyle='#ffb000';g.lineWidth=2;g.stroke();g.fillStyle='rgba(255,176,0,.12)';if(z!==zAtual)g.fill();z.forEach(([x,y])=>{g.fillStyle='#ffb000';g.fillRect(x*cv.width-3,y*cv.height-3,6,6)})})}
+new ResizeObserver(desenhaZonas).observe(cv);
+cv.onclick=e=>{if(!zAtual)zAtual=[];const r=cv.getBoundingClientRect();zAtual.push([+((e.clientX-r.left)/r.width).toFixed(4),+((e.clientY-r.top)/r.height).toFixed(4)]);desenhaZonas()};
+$('#zNova').onclick=()=>{if(zAtual&&zAtual.length>=3)zonas.push(zAtual);zAtual=[];desenhaZonas()};
+$('#zLimpar').onclick=()=>{zonas=[];zAtual=null;desenhaZonas()};
+$('#zSalvar').onclick=async()=>{if(zAtual&&zAtual.length>=3)zonas.push(zAtual);zAtual=null;await jpost('/api/seguranca/zonas',{zonas});desenhaZonas();toast('Zonas salvas')};
+$('#cSeg').onchange=e=>jpost('/api/seguranca/ativo',{ativo:e.target.checked});
+
+// medição
+$('#fDxf').onchange=async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('arquivo',f);const d=await api('/api/medicao/referencia',{body:fd});$('#refInfo').textContent=`DXF lido: ${d.furos} furo(s), ${d.recortes} recorte(s)`};
+$('#bMedir').onclick=async()=>{const v=['#r0','#r1','#r2','#r3'].map(s=>$(s).value);const roi=v.every(x=>x!=='')?v.map(Number):null;
+  const d=await jpost('/api/medicao/medir',{roi_mm:roi,usar:$('#sRef').value});refresh($('#pvMed'),'/previa/medicao.jpg');
+  let h=`<table><tr><th>Medida</th><th>Medido</th><th>Desenho</th><th>Desvio</th></tr>`;const c=d.comparacao;
+  h+=`<tr><td>Comprimento</td><td class="mono">${d.dimensoes_mm[0].toFixed(2)}</td><td class="mono">${c?c.dimensoes_ref_mm[0].toFixed(2):'—'}</td><td class="mono">${c?c.desvio_dimensoes_mm[0].toFixed(2):'—'}</td></tr>`;
+  h+=`<tr><td>Largura</td><td class="mono">${d.dimensoes_mm[1].toFixed(2)}</td><td class="mono">${c?c.dimensoes_ref_mm[1].toFixed(2):'—'}</td><td class="mono">${c?c.desvio_dimensoes_mm[1].toFixed(2):'—'}</td></tr>`;
+  (c?c.furos:d.furos).forEach((f,i)=>{h+=`<tr><td>Furo ${i+1} Ø</td><td class="mono">${f.diametro_mm.toFixed(2)}</td><td class="mono">${f.diametro_ref_mm!=null?f.diametro_ref_mm.toFixed(2):'—'}</td><td class="mono">${f.desvio_diametro_mm!=null?f.desvio_diametro_mm.toFixed(2)+' (pos '+f.desvio_posicao_mm.toFixed(2)+')':'—'}</td></tr>`});
+  if(c)h+=`<tr><td>Contorno</td><td colspan=2 class="qt">desvio médio / máximo</td><td class="mono">${c.desvio_contorno_medio_mm.toFixed(2)} / ${c.desvio_contorno_max_mm.toFixed(2)}</td></tr>`;
+  h+='</table>';if(c)h+=`<p style="font-size:18px;font-weight:700" class="${c.aprovada?'ok':'bad'}">${c.aprovada?'APROVADA':'REPROVADA'} (tolerância ±${c.tolerancia_mm} mm)</p>`;
+  $('#medRes').innerHTML=h};
+
+// calibração
+$('#bVazia').onclick=async()=>{await api('/api/calibracao/vazia');toast('Mesa vazia capturada')};
+async function marcadores(){const d=await api('/api/calibracao/marcadores',{method:'GET'});refresh($('#pvCal'),'/previa/marcadores.jpg');
+  const ids=[...new Set([...Object.keys(d.encontrados),...Object.keys(d.mm)])].sort((a,b)=>a-b);
+  $('#tMarc').innerHTML='<tr><th>ID</th><th>visto</th><th>X</th><th>Y</th><th></th></tr>'+ids.map(i=>{const mm=d.mm[i]||['',''];return `<tr><td>${i}</td><td>${d.encontrados[i]?'<span class="ok">sim</span>':'<span class="bad">não</span>'}</td>
+   <td><input type="number" step="0.01" id="mx${i}" value="${mm[0]}"></td><td><input type="number" step="0.01" id="my${i}" value="${mm[1]}"></td>
+   <td><button class="btn" onclick="regMarc(${i},true)">usar posição da tocha</button> <button class="btn" onclick="regMarc(${i},false)">salvar</button></td></tr>`}).join('')}
+window.regMarc=async(i,tocha)=>{const b={id:i};if(!tocha){b.x=+$('#mx'+i).value;b.y=+$('#my'+i).value}await jpost('/api/calibracao/registrar',b);toast('Marcador '+i+' registrado');marcadores()};
+$('#bMarc').onclick=marcadores;
+$('#bCalc').onclick=async()=>{const d=await api('/api/calibracao/calcular');toast(`Calibrado com ${d.ids.length} marcadores, erro ${d.erro_rms_mm} mm`);refresh($('#pvCal'),'/previa/orto.jpg')};
+</script>
+</body>
+</html>

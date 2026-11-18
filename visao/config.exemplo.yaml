@@ -1,0 +1,96 @@
+# PlasmaVision — configuração (copie para config.yaml e ajuste)
+# Coordenadas sempre em mm, no sistema de MÁQUINA do Mach3 (zero no home).
+
+dados: dados                     # calibração, mesa vazia, jobs e fotos de alarme
+
+mesa:
+  curso_mm: [1550, 1050, 100]
+  regiao_orto_mm: [-60, -60, 1610, 1110]   # área que a vista de cima cobre
+  escala_orto_mm_px: 1.0
+  mascara_portico_mm: [-480, 60]           # faixa do pórtico em X em relação à tocha
+
+cameras:
+  topo:                          # Câmera Module 3 Wide no pórtico da câmera, ~1 m acima da chapa
+    tipo: picamera2              # picamera2 | opencv | rtsp | arquivo | simulada
+    fonte: 0
+    resolucao: [4608, 2592]
+    fps: 4
+    rotacao: 0                   # 0 | 90 | 180 | 270
+  tocha:                         # webcam USB na placa do Z, atrás de lente de solda tonalidade 10-11
+    tipo: opencv
+    fonte: 0
+    resolucao: [640, 480]
+    fps: 30
+
+calibracao:
+  arquivo: calibracao.json
+  dicionario_aruco: DICT_4X4_50
+  marcadores_mm:                 # posição inicial; o assistente do painel corrige com a posição da tocha
+    0: [0, 0]
+    1: [1550, 0]
+    2: [1550, 1050]
+    3: [0, 1050]
+  intrinseca: ""                 # opcional: json com K e dist da lente
+
+chapa:
+  limiar_diferenca: 30
+  area_minima_mm2: 15000
+  margem_borda_mm: 8
+  fecho_mm: 12
+
+encaixe:
+  resolucao_mm: 4
+  kerf_mm: 1.6
+  folga_mm: 6
+  passo_angulo_graus: 90
+  preferencia: canto
+
+arco:
+  roi: [0.35, 0.55, 0.30, 0.40]  # região da imagem da tocha onde o arco aparece (fração x, y, largura, altura)
+  limiar_brilho: 235
+  fracao_ligado: 0.04
+  fracao_desligado: 0.01
+  quadros_confirmacao: 3
+  atraso_furacao_s: 0.6          # tempo para furar a chapa depois que o arco abre
+  tempo_parado_s: 0.4
+  tempo_perda_arco_s: 0.25
+  pausar_se_arco_apagar: true
+
+seguranca:
+  ativo: true
+  modo: pessoa                   # pessoa (precisa do modelo ONNX) | movimento
+  modelo: modelos/pessoa.onnx
+  tamanho_entrada: 640
+  confianca: 0.45
+  cada_n_quadros: 1
+  so_com_maquina_ativa: false
+  acoes: [feed_hold, corta_tocha, alarme]
+  # zonas em fração da imagem do topo; desenhe pelo painel (aba Segurança)
+
+medicao:
+  tolerancia_mm: 1.0
+  metodo: diferenca              # diferenca (usa a mesa vazia) | otsu
+  escala_mm_px: 0.5
+
+gpio:
+  ativo: true
+  feed_hold: 17                  # BCM17 (pino 11) -> optoacoplador -> entrada Feed Hold da placa USB
+  corta_tocha: 27                # BCM27 (pino 13) -> relé NF em série com o botão da tocha
+  alarme: 22                     # BCM22 (pino 15) -> relé da sirene/luz
+  pulso_s: 0.3
+
+mach3:
+  url: http://192.168.0.50:8765  # IP do PC do Mach3 + porta da ponte
+  token: troque-este-token       # o mesmo do --token da ponte
+  intervalo_s: 0.2
+
+web:
+  host: 0.0.0.0
+  porta: 8080
+  usuario: admin
+  senha: troque-esta-senha       # deixe vazio só para teste em bancada
+  qualidade_jpeg: 75
+  largura_stream: 1280
+  # quem pode mandar a máquina ANDAR (Cycle Start, enviar job). Pausar/parar: qualquer um logado.
+  # Para liberar pelo Tailscale, acrescente 100.64.0.0/10 (só se você souber o que está fazendo).
+  redes_de_comando: [127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]

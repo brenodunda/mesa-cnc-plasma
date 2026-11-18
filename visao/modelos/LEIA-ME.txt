@@ -1,0 +1,2 @@
+Coloque aqui o detector de pessoas em ONNX (pessoa.onnx).
+Veja ../scripts/exportar_modelo_pessoa.sh. Sem modelo o monitor usa detecção de movimento.
