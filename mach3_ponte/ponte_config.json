@@ -1,0 +1,9 @@
+{
+  "botao_cycle_start": 1000,
+  "botao_feed_hold": 1001,
+  "botao_stop": 1003,
+  "dro_x": 800, "dro_y": 801, "dro_z": 802,
+  "dro_maq_x": 83, "dro_maq_y": 84, "dro_maq_z": 85,
+  "led_rodando": 804,
+  "usar_coordenadas_maquina": true
+}
